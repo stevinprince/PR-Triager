@@ -1,0 +1,54 @@
+name: PR Auto-Triager
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+# Minimal permissions: read PR content, write labels + comments.
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write        # label management lives on the Issues API
+
+jobs:
+  triage:
+    name: Triage PR with Jev
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run triager
+        env:
+          # ── Jev / TypeSafe ────────────────────────────────────────────────
+          # Set exactly one of these two secrets in your repo settings.
+          # The triager checks TYPESAFE_API_KEY first; falls back to OpenRouter
+          # if only OPENROUTER_API_KEY is present.
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+          # ── GitHub ────────────────────────────────────────────────────────
+          # Automatically provided by Actions — no manual secret needed.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          # ── Confidence thresholds (optional — override defaults here) ─────
+          # RISK_CONFIDENCE_THRESHOLD: "0.75"
+          # COMPLEXITY_CONFIDENCE_THRESHOLD: "0.70"
+
+          # ── Diff truncation (optional — override defaults here) ───────────
+          # MAX_DIFF_CHARS: "8000"
+          # MAX_FILE_CHARS: "8000"
+
+        # Actions populates GITHUB_EVENT_PATH with the full event JSON.
+        # The triager package reads it to extract owner/repo/PR number.
+        run: python -m triager
